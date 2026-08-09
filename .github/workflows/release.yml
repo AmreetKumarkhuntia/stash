@@ -1,0 +1,250 @@
+name: Release
+
+# Push a tag, get an installer on the Releases page.
+#
+#     python scripts/release.py --bump minor
+#
+# is the whole story; it pushes vX.Y.Z and this takes over. The gate chain runs
+# in order and every step is fatal, so nothing is published unless the tests
+# pass, the app builds, the built binary actually runs, and the installer
+# installs, runs and uninstalls cleanly.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish a GitHub Release (leave off for a build-only dry run)'
+        type: boolean
+        default: false
+  schedule:
+    # Always a dry run. requirements.txt is pinned with >=, so a new PySide6 or
+    # a new Qt can break the frozen build with no commit of ours; this finds
+    # out within a week instead of at tag time.
+    - cron: '17 5 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  # Deliberately not cancel-in-progress: a run cancelled between
+  # `gh release create` and the asset upload leaves a release with no installer.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, smoke test, publish
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write        # gh release create
+    env:
+      BUILD_ROOT: ${{ github.workspace }}\build
+      # Empty until a certificate exists. `with:` and `env:` accept secrets but
+      # `if:` does not, so everything downstream branches on this variable
+      # rather than on the secret directly.
+      SIGN_COMMAND: ${{ secrets.INNO_SIGN_COMMAND }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # --generate-notes is computed server-side from the tag, so there is
+          # nothing here that needs history.
+          fetch-depth: 1
+
+      - name: Tag must match stashlib/_version.py
+        if: startsWith(github.ref, 'refs/tags/')
+        # First step on purpose: two seconds, and it is what makes it
+        # impossible to publish Stash-Setup-1.0.0.exe under the tag v1.2.3.
+        run: python scripts/check_version.py --expect-tag "${{ github.ref_name }}"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt -r requirements-build.txt
+          # pywin32 wires its DLL directory up through a .pth file. Fail here
+          # if that did not take, rather than five minutes into PyInstaller.
+          python -c "import win32com.client, pythoncom; print('pywin32 ok')"
+
+      - name: Read the version
+        id: version
+        shell: pwsh
+        run: |
+          $version = python scripts/check_version.py --print
+          if ($LASTEXITCODE -ne 0) { throw 'version check failed' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Stash $version"
+
+      - name: Locate Inno Setup
+        shell: pwsh
+        run: |
+          # windows-latest is Windows Server 2025, which ships InnoSetup via
+          # the Chocolatey `innosetup` package at the path below -- already the
+          # second candidate build_installer.py probes. The runner-images
+          # request to guarantee it was closed as not planned, so verify
+          # rather than assume.
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            Write-Host '::warning::Inno Setup is no longer preinstalled on this image; installing it'
+            choco install innosetup --no-progress --yes
+            # pwsh exits a step on a non-zero $LASTEXITCODE even when the
+            # failure was handled, and choco reports odd codes on success.
+            $global:LASTEXITCODE = 0
+          }
+          if (-not (Test-Path -LiteralPath $iscc)) { throw "ISCC.exe not found at $iscc" }
+          Write-Host "using $iscc"
+
+      - name: Build app and installer
+        id: build
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $arguments = @('scripts/build_installer.py', '--build-root', $env:BUILD_ROOT,
+                         '--app-version', $env:VERSION)
+          if ($env:SIGN_COMMAND) { $arguments += @('--sign-command', $env:SIGN_COMMAND) }
+          python @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'build_installer.py failed' }
+
+          $installer = Join-Path $env:BUILD_ROOT "installer\Stash-Setup-$env:VERSION.exe"
+          if (-not (Test-Path -LiteralPath $installer)) { throw "no installer at $installer" }
+          "installer=$installer" >> $env:GITHUB_OUTPUT
+          "app=$(Join-Path $env:BUILD_ROOT 'dist\Stash\Stash.exe')" >> $env:GITHUB_OUTPUT
+          '{0:N1} MB' -f ((Get-Item -LiteralPath $installer).Length / 1MB) | Write-Host
+
+      - name: Smoke test the unpacked app
+        shell: pwsh
+        run: scripts\ci\selftest.ps1 -Exe '${{ steps.build.outputs.app }}' -Label 'unpacked build'
+
+      - name: Install, run, uninstall
+        shell: pwsh
+        env:
+          INSTALLER: ${{ steps.build.outputs.installer }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # AppId from installer/Stash.iss. Inno appends _is1, and writes the
+          # key under HKCU because PrivilegesRequired=lowest.
+          $key = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{2F8B71C4-9E5A-4D63-B0A8-6C4E17D95B32}_is1'
+          $data = Join-Path $env:LOCALAPPDATA 'Stash\library'
+
+          # A canary for the invariant the [Code] section promises: a *silent*
+          # uninstall must never delete favourites and tags.
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          Set-Content -LiteralPath (Join-Path $data 'canary.txt') -Value 'must survive a silent uninstall'
+
+          Write-Host '::group::install'
+          $log = Join-Path $env:RUNNER_TEMP 'stash-install.log'
+          # PrivilegesRequired=lowest means setup never relaunches itself to
+          # elevate, so waiting on this process really is waiting on the
+          # install. /SP- skips the "This will install..." prompt.
+          $setup = Start-Process -FilePath $env:INSTALLER -PassThru `
+                   -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/LOG=$log"
+          if (-not $setup.WaitForExit(300000)) { $setup.Kill($true); throw 'installer did not finish in 5 min' }
+          $setup.WaitForExit()
+          if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 40 }
+          if ($setup.ExitCode -ne 0) { throw "installer exited $($setup.ExitCode)" }
+          Write-Host '::endgroup::'
+
+          if (-not (Test-Path -LiteralPath $key)) { throw "no uninstall entry at $key" }
+          $entry = Get-ItemProperty -LiteralPath $key
+          $location = $entry.InstallLocation.TrimEnd('\')
+          $installed = Join-Path $location 'Stash.exe'
+          $expected = Join-Path $env:LOCALAPPDATA 'Programs\Stash'
+
+          if (-not (Test-Path -LiteralPath $installed)) { throw "Stash.exe missing at $installed" }
+          if ($location -ne $expected) { throw "installed to $location, expected the per-user path $expected" }
+          # End-to-end proof that _version.py reached the shipped metadata.
+          if ($entry.DisplayVersion -ne $env:VERSION) {
+            throw "Installed apps shows $($entry.DisplayVersion), expected $env:VERSION"
+          }
+          Write-Host "installed $($entry.DisplayName) $($entry.DisplayVersion) -> $location"
+
+          scripts\ci\selftest.ps1 -Exe $installed -Label 'installed app'
+
+          Write-Host '::group::uninstall'
+          $uninstaller = Join-Path $location 'unins000.exe'
+          if (-not (Test-Path -LiteralPath $uninstaller)) { throw "no uninstaller at $uninstaller" }
+          # Inno's uninstaller copies itself into %TEMP% and the process we
+          # start here exits immediately, so -Wait would prove nothing. Poll
+          # for the registry key instead -- it is the last thing removed.
+          Start-Process -FilePath $uninstaller `
+                        -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' | Out-Null
+          $deadline = (Get-Date).AddSeconds(180)
+          while ((Test-Path -LiteralPath $key) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+          if (Test-Path -LiteralPath $key) { throw 'uninstall did not finish in 3 min' }
+          if (Test-Path -LiteralPath $installed) { throw "Stash.exe survived the uninstall: $installed" }
+          if (-not (Test-Path -LiteralPath (Join-Path $data 'canary.txt'))) {
+            throw 'a silent uninstall deleted user data -- the UninstallSilent() guard in Stash.iss regressed'
+          }
+          Write-Host '::endgroup::'
+          Write-Host 'install -> selftest -> uninstall round trip passed, user data intact'
+
+      - name: Checksums
+        id: sums
+        shell: pwsh
+        env:
+          INSTALLER: ${{ steps.build.outputs.installer }}
+        run: |
+          $sums = Join-Path (Split-Path -Parent $env:INSTALLER) 'SHA256SUMS.txt'
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:INSTALLER).Hash.ToLowerInvariant()
+          # coreutils layout (two spaces), so `sha256sum -c SHA256SUMS.txt` works.
+          "$hash  $(Split-Path -Leaf $env:INSTALLER)" |
+            Set-Content -LiteralPath $sums -Encoding ascii
+          Get-Content -LiteralPath $sums
+          "sums=$sums" >> $env:GITHUB_OUTPUT
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+
+      - name: Upload as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Stash-Setup-${{ steps.version.outputs.version }}
+          # Only the installer and the sums. Never build\dist\Stash -- that is
+          # ~245 MB across thousands of small Qt files and takes minutes to zip
+          # on Windows for no benefit.
+          path: |
+            ${{ steps.build.outputs.installer }}
+            ${{ steps.sums.outputs.sums }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0      # the .exe is already lzma2-compressed
+
+      - name: Compose the release notes
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+        shell: pwsh
+        env:
+          INSTALLER: ${{ steps.build.outputs.installer }}
+          SHA256: ${{ steps.sums.outputs.sha256 }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python scripts/ci/release_notes.py `
+            --installer $env:INSTALLER --sha256 $env:SHA256 --version $env:VERSION `
+            --out $env:RUNNER_TEMP\notes.md
+          Get-Content -LiteralPath $env:RUNNER_TEMP\notes.md
+
+      - name: Publish the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # --verify-tag refuses to invent a tag: if the ref is not already on
+          # the remote, this fails instead of creating a release pointing at
+          # a tag nobody has.
+          gh release create "${{ github.ref_name }}" `
+            "${{ steps.build.outputs.installer }}" `
+            "${{ steps.sums.outputs.sums }}" `
+            --title "Stash ${{ steps.version.outputs.version }}" `
+            --notes-file "$env:RUNNER_TEMP\notes.md" `
+            --generate-notes `
+            --verify-tag

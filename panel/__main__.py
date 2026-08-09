@@ -2,6 +2,7 @@
 
     python.exe -m panel                 # from the plugin folder
     python.exe panel\\__main__.py        # from anywhere (what the shortcut uses)
+    python.exe -m panel --selftest      # check the build, print a report, exit
 """
 
 from __future__ import annotations
@@ -17,11 +18,6 @@ _PLUGIN_DIR = Path(__file__).resolve().parent.parent
 if str(_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_DIR))
 
-from PySide6.QtGui import QIcon  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
-
-from panel.app import MainWindow  # noqa: E402
-
 
 def resource(name: str) -> Path:
     """Locate a bundled file, frozen or not.
@@ -35,6 +31,26 @@ def resource(name: str) -> Path:
         if candidate.exists():
             return candidate
     return Path(__file__).resolve().with_name(name)
+
+
+# --selftest is handled here, above the PySide6 imports, on purpose. Those
+# imports run at module level, so in a --windowed frozen build an ImportError
+# escapes to the PyInstaller bootloader, which renders it as a modal message
+# box -- on an unattended machine that is a hang, not a failure. panel.selftest
+# does every import itself, inside try/except, and only ever returns a code.
+#
+# The import is written statically so PyInstaller's module graph finds it;
+# importlib would leave panel/selftest.py out of the bundle and --selftest
+# would then fail only in the shipped build.
+if "--selftest" in sys.argv:
+    from panel.selftest import run as _run_selftest
+
+    raise SystemExit(_run_selftest(sys.argv, resource))
+
+from PySide6.QtGui import QIcon  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
+
+from panel.app import MainWindow  # noqa: E402
 
 
 def main() -> int:

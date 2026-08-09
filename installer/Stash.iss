@@ -8,11 +8,18 @@
 
 #define AppName        "Stash"
 #define AppShortName   "Stash"
-#define AppVersion     "1.0.0"
 #define AppPublisher   "Amreet Khuntia"
 #define AppExe         "Stash.exe"
 
-; Passed in by build_installer.py: /DSourceDir=... /DOutputDir=...
+; Passed in by build_installer.py: /DAppVersion=... /DSourceDir=... /DOutputDir=...
+;
+; The version below is only a fallback for compiling this script by hand. The
+; real one comes from stashlib/_version.py, the single place it lives. If the
+; fallback ever shipped it would silently mislabel a release, so CI checks the
+; produced filename and the DisplayVersion the installer writes.
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 #ifndef SourceDir
   #define SourceDir "..\..\..\dist\Stash"
 #endif
@@ -45,6 +52,14 @@ DisableProgramGroupPage=yes
 DisableDirPage=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+
+; Inert unless build_installer.py --sign-command is used, which passes
+; /DSign and /Sstashsign=<command>. Absent signing credentials mean an
+; unsigned build, not a failed one — CI has no certificate today.
+#ifdef Sign
+SignTool=stashsign
+SignedUninstaller=yes
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

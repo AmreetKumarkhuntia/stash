@@ -13,6 +13,26 @@ talks to Resolve the same way Windows Explorer does.
 
 ## Install
 
+[**Download the latest installer**](https://github.com/AmreetKumarkhuntia/stash/releases/latest)
+— one file, ~77 MB, no Python needed. It installs per-user into
+`%LOCALAPPDATA%\Programs\Stash` with no admin rights, and uninstalls from
+Settings → Apps → Installed apps.
+
+Windows SmartScreen shows *"Windows protected your PC"* the first time, because
+the build is not code-signed. **More info → Run anyway.** Every release ships a
+`SHA256SUMS.txt` next to the installer if you would rather verify the download
+first:
+
+```powershell
+(Get-FileHash -Algorithm SHA256 .\Stash-Setup-1.0.0.exe).Hash
+```
+
+Each installer is built and smoke-tested on a clean Windows runner by
+[the release workflow](.github/workflows/release.yml), never uploaded from a
+developer machine.
+
+## Install from source
+
 Double-click **`install.bat`**.
 
 It finds your Python, installs the dependencies (~250 MB of Qt the first time),
@@ -129,8 +149,9 @@ start clean.
 python.exe scripts/build_installer.py
 ```
 
-Produces **one file**, `Stash-Setup-1.0.0.exe` (~77 MB), under
-`%LOCALAPPDATA%\Stash\build\installer\`. Send that to anyone. It:
+Produces **one file**, `Stash-Setup-<version>.exe` (~77 MB), under
+`%LOCALAPPDATA%\Stash\build\installer\` — the version comes from
+`stashlib/_version.py`. Send that to anyone. It:
 
 - installs **per-user, with no admin rights** (into `%LOCALAPPDATA%\Programs`)
 - creates Start Menu and optional Desktop shortcuts
@@ -140,14 +161,26 @@ Produces **one file**, `Stash-Setup-1.0.0.exe` (~77 MB), under
 
 Needs Inno Setup once on the *build* machine:
 `winget install JRSoftware.InnoSetup`. Use `--skip-app` to recompile just the
-installer from the last app build (~40 s instead of ~5 min).
+installer from the last app build (~40 s instead of ~5 min), or `--build-root`
+to build somewhere other than `%LOCALAPPDATA%\Stash\build`.
+
+To check a build without installing it, run the shipped smoke test — it
+verifies Qt Multimedia, the bundled ffmpeg, `style.qss` and a real waveform
+render inside the frozen binary, and exits non-zero if anything is missing:
+
+```
+pwsh scripts\ci\selftest.ps1 -Exe "%LOCALAPPDATA%\Stash\build\dist\Stash\Stash.exe"
+```
 
 Silent install / uninstall, for scripted deployment:
 
 ```
-Stash-Setup-1.0.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+Stash-Setup-1.2.3.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 "%LOCALAPPDATA%\Programs\Stash\unins000.exe" /VERYSILENT
 ```
+
+CI runs exactly this round trip on every release, and checks that a silent
+uninstall leaves your library data alone.
 
 **Uninstalling never touches your library data unless you say so.** An
 interactive uninstall asks whether to also delete the index, thumbnails,
@@ -171,6 +204,47 @@ executable (slower to start — it unpacks each run), `--outdir` builds elsewher
 > DLL-shaped plugins are OFX effects, which process frames and cannot draw a
 > browser UI.
 
+## Releasing
+
+The version lives in exactly one place, `stashlib/_version.py`. Everything else
+— the Inno `AppVersion`, the installer filename, the exe's file properties, the
+"Installed apps" entry, the git tag — is derived from it.
+
+```
+python scripts/release.py --bump minor
+```
+
+That bumps the file, stamps `CHANGELOG.md`, commits, tags `vX.Y.Z` and pushes.
+The tag starts [`release.yml`](.github/workflows/release.yml), which on a clean
+Windows runner builds the app and installer, runs the frozen binary's
+`--selftest`, installs it, runs the selftest again on the *installed* copy,
+uninstalls it, and then publishes `Stash-Setup-X.Y.Z.exe` plus `SHA256SUMS.txt`
+to a new GitHub Release. Any step failing means nothing is published.
+
+Write what changed under `## Unreleased` in `CHANGELOG.md` first — `release.py`
+refuses to cut a release with an empty section. Use `--dry-run` to check
+everything without touching the repo, and `1.2.3` instead of `--bump` to set an
+exact version.
+
+Before the first release from a new machine, or after changing anything under
+`scripts/` or `installer/`, run the workflow by hand from **Actions → Release →
+Run workflow** with `publish` unchecked: same build, same tests, nothing
+published. A tag that fails to build is deleted with
+`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`.
+
+Releases are **not code-signed**, so SmartScreen warns on download. Enabling
+signing later is one repository secret, `INNO_SIGN_COMMAND`, and no code
+change — both build scripts take `--sign-command`, and `installer/Stash.iss`
+has the `SignTool` block behind `#ifdef Sign`. Write it in Inno's form, with
+`$f` for the file:
+
+```
+signtool.exe sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f
+```
+
+The app is signed as well as the installer — a signed `Setup.exe` that lays
+down an unsigned `Stash.exe` still trips SmartScreen when the app launches.
+
 ## Command line
 
 The core (`stashlib/`) has no Qt in it and runs on its own — useful for
@@ -191,16 +265,26 @@ python.exe -m stashlib.normalize          # filename-normaliser self-test
 stash/
 ├── install.bat            one-time setup: deps + icon + shortcuts
 ├── run_panel.bat          double-click to launch
-├── requirements.txt
+├── requirements.txt       what the app needs to run
+├── requirements-build.txt PyInstaller, pinned (build only)
+├── CHANGELOG.md           hand-written; release.py stamps the headings
+├── .github/workflows/
+│   ├── ci.yml             fast gate on every push
+│   └── release.yml        tag -> build -> smoke test -> GitHub Release
 ├── installer/
 │   └── Stash.iss          Inno Setup script -> Setup.exe with uninstaller
 ├── stashlib/              core: scan, index, search, thumbnails  (no Qt)
+│   └── _version.py        the version, and the only copy of it
 ├── panel/                 the PySide6 window
+│   └── selftest.py        does the frozen build actually work?
 ├── scripts/
 │   ├── make_icon.py       draws panel/icon.ico
 │   ├── install_shortcut.py  Desktop + Start Menu (--remove to undo)
 │   ├── build_exe.py       standalone .exe via PyInstaller
 │   ├── build_installer.py distributable Setup.exe via Inno Setup
+│   ├── check_version.py   version is well formed / matches the tag
+│   ├── release.py         bump, tag, push — CI does the rest
+│   ├── ci/                helpers the workflows call
 │   └── spike_drag.py      drag-into-Resolve regression harness
 └── NOTES.md               measurements, gotchas, TODOs
 ```

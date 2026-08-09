@@ -1,0 +1,9 @@
+# Build-only tooling. Not needed to run Stash from source.
+#
+#   python.exe -m pip install -r requirements-build.txt
+#
+# Pinned exactly, unlike requirements.txt: PyInstaller's output changes between
+# releases, so an unpinned build tool means the installer can break with no
+# commit of yours. Bump this deliberately and re-run a release dry run
+# (Actions > Release > Run workflow, "publish" unchecked).
+pyinstaller==6.22.0
