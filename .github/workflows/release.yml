@@ -178,6 +178,15 @@ jobs:
             throw "Installed apps shows $($entry.DisplayVersion), expected $env:VERSION"
           }
           Write-Host "installed $($entry.DisplayName) $($entry.DisplayVersion) -> $location"
+          # The metadata Settings > Apps > Installed apps shows. Printed rather
+          # than asserted: it is presentation, and a hard check here would fail
+          # a release over a reworded sentence.
+          foreach ($field in 'Publisher', 'Comments', 'URLInfoAbout', 'HelpLink', 'URLUpdateInfo') {
+            Write-Host ("  {0,-13} {1}" -f $field, $entry.$field)
+          }
+          if (-not $entry.URLUpdateInfo) {
+            Write-Host '::warning::AppUpdatesURL did not reach the registry — no update link in Installed apps'
+          }
 
           scripts\ci\selftest.ps1 -Exe $installed -Label 'installed app'
 

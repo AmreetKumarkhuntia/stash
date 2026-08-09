@@ -10,6 +10,8 @@
 #define AppShortName   "Stash"
 #define AppPublisher   "Amreet Khuntia"
 #define AppExe         "Stash.exe"
+#define AppUrl         "https://github.com/AmreetKumarkhuntia/stash"
+#define AppComments    "Searchable media library that drags into DaVinci Resolve"
 
 ; Passed in by build_installer.py: /DAppVersion=... /DSourceDir=... /DOutputDir=...
 ;
@@ -35,6 +37,14 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
+; These four land in the uninstall registry key as Comments, URLInfoAbout,
+; HelpLink and URLUpdateInfo, which is what Settings > Apps > Installed apps
+; reads. Without them the entry is a bare name with no way back to the project,
+; and no route to a newer build for someone who did not install it themselves.
+AppComments={#AppComments}
+AppPublisherURL={#AppUrl}
+AppSupportURL={#AppUrl}/issues
+AppUpdatesURL={#AppUrl}/releases/latest
 DefaultDirName={autopf}\{#AppShortName}
 DefaultGroupName={#AppName}
 UninstallDisplayName={#AppName}

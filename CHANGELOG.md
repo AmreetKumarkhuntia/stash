@@ -7,6 +7,10 @@ carries the section below its version.
 
 ## Unreleased
 
+- The Windows "Installed apps" entry now carries a description and links:
+  the project page, an issues link for support, and an updates link straight
+  to the latest release. Previously it was a bare name with no route back to
+  the project, which matters for anyone who did not install it themselves.
 - The Actions list now tells the two runs apart. The CI workflow is named
   **Check**, and Release titles itself `Release vX.Y.Z` on a tag or
   `Dry run · <branch>` when started by hand — previously both rows showed the
