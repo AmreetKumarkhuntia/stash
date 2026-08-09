@@ -7,6 +7,8 @@ carries the section below its version.
 
 ## Unreleased
 
+- CONTRIBUTING.md documents the commit message format and the release
+  process, including why creating a release from the web UI does not work.
 - The release workflow publishes on a tag and only on a tag; a manual run
   is always a dry run. The old `publish` checkbox could not work from a
   branch, where `github.ref_name` is the branch rather than a tag.

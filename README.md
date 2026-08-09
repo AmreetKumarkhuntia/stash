@@ -222,34 +222,14 @@ uninstalls it, and then publishes `Stash-Setup-X.Y.Z.exe` plus `SHA256SUMS.txt`
 to a new GitHub Release. Any step failing means nothing is published.
 
 Write what changed under `## Unreleased` in `CHANGELOG.md` first — `release.py`
-refuses to cut a release with an empty section. Use `--dry-run` to check
-everything without touching the repo, and `1.2.3` instead of `--bump` to set an
-exact version.
+refuses to cut a release with an empty section.
 
-Before the first release from a new machine, or after changing anything under
-`scripts/` or `installer/`, run the workflow by hand from **Actions → Release →
-Run workflow**. Started from a branch that is always a **dry run** — same
-build, same tests, nothing published — because publishing is gated on the ref
-being a tag and nothing else. The installer is attached to the run as an
-artifact so you can download and try it.
+**Do not create releases from the GitHub web UI.** It leaves `_version.py`
+untouched, so the tag check fails and you end up with a public release that has
+no installer on it. Editing the notes in the browser afterwards is fine.
 
-A tag that fails to build is deleted with
-`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`. If a release *build*
-succeeded but publishing flaked, re-run the workflow from the tag itself rather
-than re-tagging.
-
-Releases are **not code-signed**, so SmartScreen warns on download. Enabling
-signing later is one repository secret, `INNO_SIGN_COMMAND`, and no code
-change — both build scripts take `--sign-command`, and `installer/Stash.iss`
-has the `SignTool` block behind `#ifdef Sign`. Write it in Inno's form, with
-`$f` for the file:
-
-```
-signtool.exe sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f
-```
-
-The app is signed as well as the installer — a signed `Setup.exe` that lays
-down an unsigned `Stash.exe` still trips SmartScreen when the app launches.
+Full detail — commit message format, choosing the bump, recovering from a bad
+tag, and enabling code signing — is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Command line
 
@@ -274,6 +254,7 @@ stash/
 ├── requirements.txt       what the app needs to run
 ├── requirements-build.txt PyInstaller, pinned (build only)
 ├── CHANGELOG.md           hand-written; release.py stamps the headings
+├── CONTRIBUTING.md        commit format + how to cut a release
 ├── .github/workflows/
 │   ├── ci.yml             fast gate on every push
 │   └── release.yml        tag -> build -> smoke test -> GitHub Release
