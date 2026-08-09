@@ -25,6 +25,7 @@ instead of `chore` if you want the extra precision; the shape is the same.
 | `installer` | `Stash.iss`, the build scripts |
 | `release` | versioning, tagging, `release.py` |
 | `ci` | the GitHub Actions workflows |
+| `tooling` | `package.json`, the `.bat` launchers, dev ergonomics |
 | `docs` | README, NOTES, this file |
 
 **Rules that matter:**
@@ -84,14 +85,16 @@ the release job, so a mismatch costs two seconds instead of twelve minutes.
 3. **Cut it.**
 
    ```
-   python scripts/release.py --bump patch     # or minor / major, or 1.2.3
+   npm run publish:patch                 # or :minor / :major / :dry
+   python scripts/release.py 1.2.3       # an exact version instead of a bump
    ```
 
    `--dry-run` checks everything and writes nothing. `--no-push` commits and
    tags locally so you can inspect before pushing.
 
    That bumps `_version.py`, stamps the `CHANGELOG.md` heading with today's
-   date, commits as `Release vX.Y.Z`, tags, and runs
+   date, commits as `chore(release): vX.Y.Z`, tags `vX.Y.Z` with the changelog
+   entry as the tag message, and runs
    `git push --atomic origin main vX.Y.Z` — atomic so a tag never arrives
    without its commit.
 
@@ -103,7 +106,23 @@ the release job, so a mismatch costs two seconds instead of twelve minutes.
 
 Choosing the bump: `feat` commits since the last tag mean `minor`, `fix`-only
 means `patch`, a breaking change to the library index or config layout means
-`major`.
+`major`. Tooling-only changes do not need a release of their own — the shipped
+app is identical, so let them ride along with the next real one.
+
+### Two workflow runs per release is normal
+
+Step 3 pushes the branch and the tag in one atomic push, so **two** runs start
+from the same commit:
+
+| Run | Ref | What it does |
+|---|---|---|
+| **Check** | `main` | ~3 min gate: compile, the no-Qt rule, corpus, selftest from source. No build. |
+| **Release** | `vX.Y.Z` | Builds, smoke-tests, installs/uninstalls, publishes. |
+
+Not a double build — `ci.yml` deliberately does not build, so the overlap is
+about a minute of dependency install. In the Actions list Check keeps the
+commit subject as its title and Release names itself `Release vX.Y.Z`, or
+`Dry run · <branch>` when it was started by hand.
 
 ### Do not create releases in the browser
 

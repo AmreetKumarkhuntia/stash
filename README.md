@@ -76,14 +76,21 @@ discoverable list; `npm run` with no arguments prints them all.
 | `npm run setup` | install the Python dependencies |
 | `npm test` | byte-compile everything and run the 20-case normalise corpus |
 | `npm run selftest` | 10 checks against the real build — Qt Multimedia, bundled ffmpeg, `style.qss`, a live waveform render |
+| `npm run check` | both of the above — what the **Check** workflow runs |
 | `npm run build` | standalone app folder via PyInstaller |
 | `npm run installer` | distributable `Setup.exe` via Inno Setup |
 | `npm run ver` | print the current version |
-| `npm run release:patch` | cut a release (also `:minor`, `:major`, `:dry`) |
+| `npm run publish:patch` | cut a release (also `:minor`, `:major`, `:dry`) |
 | `npm run scan` / `search` / `roots` / `tags` | the CLI |
 
-Pass arguments after `--`, e.g. `npm run search -- "air horn" --kind audio` or
-`npm run release -- 1.2.3`.
+For an exact version rather than a bump, call the script directly:
+`python scripts/release.py 1.2.3`.
+
+There is no bare `publish`, `install` or `version` script — npm fires those as
+lifecycle hooks on `npm publish` / `npm install` / `npm version`, so they are
+`publish:<bump>`, `setup` and `ver`.
+
+Pass arguments after `--`, e.g. `npm run search -- "air horn" --kind audio`.
 
 Scripts split across two interpreters on purpose. Anything touching Qt, the GUI
 or the build runs on **Windows Python** (`python.exe`) — a WSL interpreter

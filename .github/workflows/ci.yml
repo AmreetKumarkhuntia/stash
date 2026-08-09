@@ -1,5 +1,13 @@
-name: CI
+name: Check
 
+# There is deliberately no `run-name` here. Omitted, GitHub titles the run with
+# the first line of the commit message, computed server-side -- which is
+# exactly what we want. Do not "fix" this with an expression: the only handle
+# available is github.event.head_commit.message, which is the *whole* message
+# including the body, and GitHub expressions have no split or substring to trim
+# it with. release.yml does set run-name, because there the useful title is the
+# tag, not the commit.
+#
 # The fast gate: everything that can be checked without building an installer.
 # Building is release.yml's job -- scripts/release.py pushes the branch and the
 # tag atomically, so both workflows fire on the same tree and building here

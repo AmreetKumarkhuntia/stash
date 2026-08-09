@@ -14,6 +14,13 @@
     "  python3     -- WSL. Version, changelog and release plumbing, which is pure",
     "                 stdlib plus git and has no reason to cross the boundary.",
     "",
+    "Script names dodge npm's lifecycle hooks, which fire on the bare npm verb:",
+    "  install -> setup      version -> ver      publish -> publish:<bump>",
+    "A script literally named `install`, `version` or `publish` would run on",
+    "`npm install` / `npm version` / `npm publish`. Colon-suffixed names do not.",
+    "",
+    "For an exact version rather than a bump: python scripts/release.py 1.2.3",
+    "",
     "`npm run` with no arguments lists everything below."
   ],
   "name": "stash",
@@ -32,12 +39,13 @@
     "build": "python.exe scripts/build_exe.py",
     "installer": "python.exe scripts/build_installer.py",
 
+    "check": "npm run test && python.exe -m panel --selftest",
+
     "ver": "python3 scripts/check_version.py --print",
-    "release": "python3 scripts/release.py",
-    "release:dry": "python3 scripts/release.py --bump patch --dry-run",
-    "release:patch": "python3 scripts/release.py --bump patch",
-    "release:minor": "python3 scripts/release.py --bump minor",
-    "release:major": "python3 scripts/release.py --bump major",
+    "publish:dry": "python3 scripts/release.py --bump patch --dry-run",
+    "publish:patch": "python3 scripts/release.py --bump patch",
+    "publish:minor": "python3 scripts/release.py --bump minor",
+    "publish:major": "python3 scripts/release.py --bump major",
 
     "scan": "python.exe -m stashlib.cli scan",
     "search": "python.exe -m stashlib.cli search",

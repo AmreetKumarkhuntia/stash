@@ -7,10 +7,20 @@ carries the section below its version.
 
 ## Unreleased
 
+- The Actions list now tells the two runs apart. The CI workflow is named
+  **Check**, and Release titles itself `Release vX.Y.Z` on a tag or
+  `Dry run · <branch>` when started by hand — previously both rows showed the
+  same commit subject and a dry run looked like a real release.
+- `release.py` now writes a conventional commit, `chore(release): vX.Y.Z`
+  with a body, and puts the changelog entry in the annotated tag so
+  `git show vX.Y.Z` reports what shipped.
+- `npm run check` runs what the Check workflow runs; releases are cut with
+  `npm run publish:patch|minor|major`.
+
 ## 1.2.0 — 2026-08-09
 
 - `package.json` as a task runner: `npm start`, `npm test`, `npm run build`,
-  `npm run installer`, `npm run release:patch` and the CLI, all in one
+  `npm run installer`, `npm run publish:patch` and the CLI, all in one
   discoverable list. No JS dependencies and no `npm install` step.
 ## 1.1.0 — 2026-08-09
 

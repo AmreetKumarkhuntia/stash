@@ -171,8 +171,26 @@ def main() -> int:
     write_version(new)
     promote_changelog(new)
     git("add", "stashlib/_version.py", "CHANGELOG.md")
-    git("commit", "-m", f"Release v{new}")
-    git("tag", "-a", f"v{new}", "-m", f"Stash {new}")
+    # Separate -m arguments become separate paragraphs, which is how the format
+    # in CONTRIBUTING.md wants a body attached. The one commit this repo
+    # generates for itself should follow the same rule as every hand-written
+    # one.
+    git(
+        "commit",
+        "-m", f"chore(release): v{new}",
+        "-m", (
+            f"Bumps stashlib/_version.py to {new} and stamps the CHANGELOG "
+            f"heading.\nWritten by scripts/release.py — do not hand-edit either.\n\n"
+            f"Pushing the tag v{new} is what triggers the build and publish."
+        ),
+    )
+    # The tag NAME is load-bearing: release.yml matches tags: ['v*'] and
+    # check_version.py --expect-tag compares against it. Only the message
+    # carries the changelog, so `git show v{new}` reports what shipped.
+    # `body` is empty under --allow-empty-changelog; passing it anyway would
+    # append a blank paragraph.
+    tag_message = ["-m", f"Stash {new}"] + (["-m", body] if body else [])
+    git("tag", "-a", f"v{new}", *tag_message)
 
     if args.no_push:
         print(

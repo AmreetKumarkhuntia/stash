@@ -1,5 +1,12 @@
 name: Release
 
+# What this run is, said in the Actions list rather than left to be inferred.
+# Without it the title falls back to the commit message, which on a release is
+# the same commit Check just ran on -- two identical-looking rows. A dispatch
+# from a branch reads "Dry run" because that is what it is: publishing is gated
+# on the ref being a tag, the same startsWith test used further down.
+run-name: ${{ startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || format('Dry run · {0}', github.ref_name) }}
+
 # Push a tag, get an installer on the Releases page.
 #
 #     python scripts/release.py --bump minor
