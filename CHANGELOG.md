@@ -7,6 +7,8 @@ carries the section below its version.
 
 ## Unreleased
 
+## 1.2.0 — 2026-08-09
+
 - `package.json` as a task runner: `npm start`, `npm test`, `npm run build`,
   `npm run installer`, `npm run release:patch` and the CLI, all in one
   discoverable list. No JS dependencies and no `npm install` step.
