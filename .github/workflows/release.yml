@@ -12,12 +12,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # A manual run from a branch is always a dry run: it builds and runs every
+  # test but publishes nothing, because publishing is gated on the ref being a
+  # tag and nothing else. There is deliberately no "publish" checkbox -- on a
+  # workflow_dispatch github.ref_name is the *branch* you dispatched from, so a
+  # checkbox would ask gh to create a release for a tag named `main`, which
+  # --verify-tag then refuses. Tagging is scripts/release.py's job. Dispatching
+  # from a tag ref does publish, which is what makes a failed release re-runnable.
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Publish a GitHub Release (leave off for a build-only dry run)'
-        type: boolean
-        default: false
   schedule:
     # Always a dry run. requirements.txt is pinned with >=, so a new PySide6 or
     # a new Qt can break the frozen build with no commit of ours; this finds
@@ -220,7 +222,7 @@ jobs:
           compression-level: 0      # the .exe is already lzma2-compressed
 
       - name: Compose the release notes
-        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           INSTALLER: ${{ steps.build.outputs.installer }}
@@ -233,7 +235,7 @@ jobs:
           Get-Content -LiteralPath $env:RUNNER_TEMP\notes.md
 
       - name: Publish the GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -248,3 +250,36 @@ jobs:
             --notes-file "$env:RUNNER_TEMP\notes.md" `
             --generate-notes `
             --verify-tag
+
+      - name: Say what happened
+        if: success()
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA256: ${{ steps.sums.outputs.sha256 }}
+        run: |
+          $installer = "Stash-Setup-$env:VERSION.exe"
+          if ('${{ github.ref }}'.StartsWith('refs/tags/')) {
+            $lines = @(
+              "## Published Stash $env:VERSION",
+              "",
+              "[Releases page](https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}) — ``$installer`` and ``SHA256SUMS.txt``.",
+              "",
+              "``````", $env:SHA256, "``````"
+            )
+          } else {
+            # Otherwise the skipped publish steps are the only clue, and a
+            # skipped step reads a lot like a broken one.
+            $lines = @(
+              "## Dry run — nothing published",
+              "",
+              "Built ``$installer``, ran the selftest on the unpacked and the",
+              "installed app, and completed the install/uninstall round trip.",
+              "It is attached to this run as an artifact.",
+              "",
+              "Publishing only ever happens on a tag. To cut a real release:",
+              "",
+              "``````", "python scripts/release.py --bump patch", "``````"
+            )
+          }
+          $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

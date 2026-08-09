@@ -11,9 +11,9 @@ up on the Releases page is the one CI built on a clean Windows runner, never
 one from this machine.
 
 Before the first release from a new machine, or after touching anything under
-scripts/ or installer/, run the workflow manually with `publish` unchecked --
-that does the whole build without publishing, so a broken build costs a re-run
-rather than a deleted tag.
+scripts/ or installer/, run the workflow manually from Actions > Release. Run
+from a branch it is always a dry run -- the whole build and every test, but
+nothing published -- so a broken build costs a re-run rather than a deleted tag.
 
 Every check below is fatal, in this order:
 

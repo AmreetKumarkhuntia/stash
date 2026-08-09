@@ -7,6 +7,9 @@ carries the section below its version.
 
 ## Unreleased
 
+- The release workflow publishes on a tag and only on a tag; a manual run
+  is always a dry run. The old `publish` checkbox could not work from a
+  branch, where `github.ref_name` is the branch rather than a tag.
 - CI/CD: tagging `vX.Y.Z` now builds the installer on a clean Windows runner
   and publishes it to GitHub Releases, with the version coming from a single
   place (`stashlib/_version.py`).

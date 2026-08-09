@@ -228,9 +228,15 @@ exact version.
 
 Before the first release from a new machine, or after changing anything under
 `scripts/` or `installer/`, run the workflow by hand from **Actions → Release →
-Run workflow** with `publish` unchecked: same build, same tests, nothing
-published. A tag that fails to build is deleted with
-`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`.
+Run workflow**. Started from a branch that is always a **dry run** — same
+build, same tests, nothing published — because publishing is gated on the ref
+being a tag and nothing else. The installer is attached to the run as an
+artifact so you can download and try it.
+
+A tag that fails to build is deleted with
+`git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z`. If a release *build*
+succeeded but publishing flaked, re-run the workflow from the tag itself rather
+than re-tagging.
 
 Releases are **not code-signed**, so SmartScreen warns on download. Enabling
 signing later is one repository secret, `INNO_SIGN_COMMAND`, and no code
