@@ -7,6 +7,8 @@ carries the section below its version.
 
 ## Unreleased
 
+## 1.3.0 — 2026-08-09
+
 - The Windows "Installed apps" entry now carries a description and links:
   the project page, an issues link for support, and an updates link straight
   to the latest release. Previously it was a bare name with no route back to

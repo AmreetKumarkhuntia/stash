@@ -16,4 +16,4 @@ VERSIONINFO resource needs four integers, and the Inno preprocessor has to
 guess whether /DAppVersion=1.2 is a number or a string.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
