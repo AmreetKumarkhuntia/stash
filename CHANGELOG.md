@@ -7,6 +7,8 @@ carries the section below its version.
 
 ## Unreleased
 
+## 1.1.0 — 2026-08-09
+
 - CONTRIBUTING.md documents the commit message format and the release
   process, including why creating a release from the web UI does not work.
 - The release workflow publishes on a tag and only on a tag; a manual run
