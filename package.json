@@ -1,0 +1,47 @@
+{
+  "//": [
+    "A task runner, nothing more. Stash is a Python project and this file has no",
+    "dependencies -- `npm install` is never needed, only `npm run <script>`.",
+    "",
+    "There is deliberately NO `version` field. The version lives in",
+    "stashlib/_version.py and nowhere else; a copy here would be one more thing",
+    "that can disagree with the git tag. `npm run ver` reads the real one.",
+    "",
+    "Scripts split by interpreter on purpose:",
+    "  python.exe  -- Windows Python. Anything touching Qt, the GUI, or the build.",
+    "                 A WSL interpreter cannot host the panel: the drag into",
+    "                 Resolve is a native Windows CF_HDROP.",
+    "  python3     -- WSL. Version, changelog and release plumbing, which is pure",
+    "                 stdlib plus git and has no reason to cross the boundary.",
+    "",
+    "`npm run` with no arguments lists everything below."
+  ],
+  "name": "stash",
+  "private": true,
+  "description": "Searchable media library that drags into DaVinci Resolve",
+  "license": "MIT",
+  "scripts": {
+    "start": "python.exe -m panel",
+    "setup": "python.exe -m pip install -r requirements.txt",
+    "icon": "python.exe scripts/make_icon.py",
+    "shortcut": "python.exe scripts/install_shortcut.py",
+
+    "test": "python3 -m compileall -q panel stashlib scripts && python3 -m stashlib.normalize",
+    "selftest": "python.exe -m panel --selftest",
+
+    "build": "python.exe scripts/build_exe.py",
+    "installer": "python.exe scripts/build_installer.py",
+
+    "ver": "python3 scripts/check_version.py --print",
+    "release": "python3 scripts/release.py",
+    "release:dry": "python3 scripts/release.py --bump patch --dry-run",
+    "release:patch": "python3 scripts/release.py --bump patch",
+    "release:minor": "python3 scripts/release.py --bump minor",
+    "release:major": "python3 scripts/release.py --bump major",
+
+    "scan": "python.exe -m stashlib.cli scan",
+    "search": "python.exe -m stashlib.cli search",
+    "roots": "python.exe -m stashlib.cli roots",
+    "tags": "python.exe -m stashlib.cli tags"
+  }
+}

@@ -14,7 +14,7 @@ talks to Resolve the same way Windows Explorer does.
 ## Install
 
 [**Download the latest installer**](https://github.com/AmreetKumarkhuntia/stash/releases/latest)
-— one file, ~77 MB, no Python needed. It installs per-user into
+— one file, ~81 MB, no Python needed. It installs per-user into
 `%LOCALAPPDATA%\Programs\Stash` with no admin rights, and uninstalls from
 Settings → Apps → Installed apps.
 
@@ -24,7 +24,7 @@ the build is not code-signed. **More info → Run anyway.** Every release ships 
 first:
 
 ```powershell
-(Get-FileHash -Algorithm SHA256 .\Stash-Setup-1.0.0.exe).Hash
+Get-FileHash -Algorithm SHA256 .\Stash-Setup-*.exe
 ```
 
 Each installer is built and smoke-tested on a clean Windows runner by
@@ -57,11 +57,43 @@ Any of these:
 - the **Desktop / Start Menu shortcut** created by the installer
 - double-click **`run_panel.bat`**
 - `python.exe -m panel` from this folder
+- `npm start` (see [Commands](#commands))
 
 First launch asks you to pick folders. Point it at anything — memes, SFX packs,
 green screens, overlays, gifs, thumbnails. Sub-folders are included and their
 names become searchable tags automatically, so a file in
 `SFX Pack\Alarm & Chime\` is findable by typing `alarm` or `chime`.
+
+## Commands
+
+`package.json` is a task runner and nothing else — no JS, no dependencies, and
+`npm install` is never needed. It exists so every command lives in one
+discoverable list; `npm run` with no arguments prints them all.
+
+| | |
+|---|---|
+| `npm start` | launch the panel |
+| `npm run setup` | install the Python dependencies |
+| `npm test` | byte-compile everything and run the 20-case normalise corpus |
+| `npm run selftest` | 10 checks against the real build — Qt Multimedia, bundled ffmpeg, `style.qss`, a live waveform render |
+| `npm run build` | standalone app folder via PyInstaller |
+| `npm run installer` | distributable `Setup.exe` via Inno Setup |
+| `npm run ver` | print the current version |
+| `npm run release:patch` | cut a release (also `:minor`, `:major`, `:dry`) |
+| `npm run scan` / `search` / `roots` / `tags` | the CLI |
+
+Pass arguments after `--`, e.g. `npm run search -- "air horn" --kind audio` or
+`npm run release -- 1.2.3`.
+
+Scripts split across two interpreters on purpose. Anything touching Qt, the GUI
+or the build runs on **Windows Python** (`python.exe`) — a WSL interpreter
+cannot host the panel, because the drag into Resolve is a native Windows
+`CF_HDROP`. The version and release plumbing is pure stdlib plus git, so it runs
+on whatever `python3` is to hand. If you work entirely on Windows both resolve
+to the same interpreter and it makes no difference.
+
+There is deliberately **no `version` field** in `package.json`. The version
+lives in `stashlib/_version.py` and nowhere else.
 
 ## Getting things into Resolve
 
@@ -149,7 +181,7 @@ start clean.
 python.exe scripts/build_installer.py
 ```
 
-Produces **one file**, `Stash-Setup-<version>.exe` (~77 MB), under
+Produces **one file**, `Stash-Setup-<version>.exe` (~81 MB), under
 `%LOCALAPPDATA%\Stash\build\installer\` — the version comes from
 `stashlib/_version.py`. Send that to anyone. It:
 
@@ -251,6 +283,7 @@ python.exe -m stashlib.normalize          # filename-normaliser self-test
 stash/
 ├── install.bat            one-time setup: deps + icon + shortcuts
 ├── run_panel.bat          double-click to launch
+├── package.json           task runner: npm run <script>
 ├── requirements.txt       what the app needs to run
 ├── requirements-build.txt PyInstaller, pinned (build only)
 ├── CHANGELOG.md           hand-written; release.py stamps the headings
