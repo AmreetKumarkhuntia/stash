@@ -76,12 +76,14 @@ discoverable list; `npm run` with no arguments prints them all.
 | `npm run setup` | install the Python dependencies |
 | `npm test` | byte-compile everything and run the 20-case normalise corpus |
 | `npm run selftest` | 10 checks against the real build — Qt Multimedia, bundled ffmpeg, `style.qss`, a live waveform render |
-| `npm run check` | both of the above — what the **Check** workflow runs |
+| `npm run check` | both of the above, before pushing. The **Check** workflow runs these plus the version check, the panel-import step and the "stashlib must not import Qt" gate, which need CI's clean interpreter |
 | `npm run build` | standalone app folder via PyInstaller |
 | `npm run installer` | distributable `Setup.exe` via Inno Setup |
+| `npm run icon` | regenerate `panel/icon.ico` |
+| `npm run shortcut` | put a Start Menu shortcut on this machine |
 | `npm run ver` | print the current version |
 | `npm run publish:patch` | cut a release (also `:minor`, `:major`, `:dry`) |
-| `npm run scan` / `search` / `roots` / `tags` | the CLI |
+| `npm run scan` / `search` / `roots` / `tags` / `tag` | the CLI |
 
 For an exact version rather than a bump, call the script directly:
 `python scripts/release.py 1.2.3`.
@@ -134,6 +136,7 @@ the way.
 | `↑ ↓ ← →` | move through results — sounds auto-play as you go |
 | `Space` | play / stop the selected item |
 | `F` | favourite |
+| `T` | edit this file's own tags |
 | `Ctrl+1..4` | All / Video / Audio / Image |
 | `Ctrl+F` | jump to the search box |
 | `Ctrl+C` | copy the file path |
@@ -143,6 +146,12 @@ the way.
 
 Buttons: **★** favourites only · **🔊** auto-play on/off · **▤** compact mode ·
 **📌** always on top · **＋** folders · **⟳** rescan.
+
+Under the search box is a row of **tag chips** — the most common tags in
+whatever you are currently looking at. Click to narrow; click several and you
+get only the files carrying all of them. The chips are computed from the
+results *before* the chip filter, so the row stays useful after the first
+click instead of collapsing to the one tag you picked.
 
 ## Search
 
@@ -171,6 +180,17 @@ all get stripped, so typing what you actually mean finds the file.
 ```
 
 Now typing `bruh` finds `Bass Boost.mp3`.
+
+`aliases` and `path_tags` are library-wide. For one file, press **T** on its
+tile — or from the command line:
+
+```
+npm run tag -- "Vine Boom" bruh reaction     # replaces that file's tags
+npm run tag -- "Vine Boom" --clear
+```
+
+Those words join the search index immediately, and they are stored by path, so
+they survive a rescan and even removing and re-adding the folder.
 
 ## Folders
 
@@ -279,10 +299,17 @@ scripting, and it's how the search ranking gets tuned:
 python.exe -m stashlib.cli scan
 python.exe -m stashlib.cli search "air horn"
 python.exe -m stashlib.cli search whoosh --kind audio --limit 10
+python.exe -m stashlib.cli search "green screen" --tag overlay --tag chroma
+python.exe -m stashlib.cli search boom --root Overlays
 python.exe -m stashlib.cli roots --add "D:\videos\overlays" --label Overlays
-python.exe -m stashlib.cli tags
+python.exe -m stashlib.cli tags                       # most common tags
+python.exe -m stashlib.cli tag "Vine Boom" bruh       # set one file's tags
 python.exe -m stashlib.normalize          # filename-normaliser self-test
 ```
+
+`--tag` and `--root` both repeat. Several `--tag`s narrow (a file must carry
+all of them); several `--root`s widen. `--root` takes either the folder path or
+the label shown by `roots`.
 
 ## Layout
 
@@ -313,7 +340,7 @@ stash/
 │   ├── release.py         bump, tag, push — CI does the rest
 │   ├── ci/                helpers the workflows call
 │   └── spike_drag.py      drag-into-Resolve regression harness
-└── NOTES.md               measurements, gotchas, TODOs
+└── NOTES.md               measurements, gotchas, post-mortems
 ```
 
 ## If something goes wrong

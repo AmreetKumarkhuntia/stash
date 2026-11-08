@@ -50,6 +50,7 @@
     "scan": "python.exe -m stashlib.cli scan",
     "search": "python.exe -m stashlib.cli search",
     "roots": "python.exe -m stashlib.cli roots",
-    "tags": "python.exe -m stashlib.cli tags"
+    "tags": "python.exe -m stashlib.cli tags",
+    "tag": "python.exe -m stashlib.cli tag"
   }
 }

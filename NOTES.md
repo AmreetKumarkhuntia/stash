@@ -1,8 +1,9 @@
 # Stash — findings & friction log
 
-Companion to `docs/fusion-3d-notes.md`. Everything here was measured on this
-machine (Resolve 21.0.0.48 **free** edition, Windows Python `E:\Python\python.exe`
-3.12.8) — don't re-derive it.
+Companion to `docs/fusion-3d-notes.md` **in the sibling `mcp-da-vinci` repo** —
+that is a separate checkout, not a folder here. Everything below was measured on
+this machine (Resolve 21.0.0.48 **free** edition, Windows Python
+`E:\Python\python.exe` 3.12.8) — don't re-derive it.
 
 ## Phase 0 — the drag gate: PASSED
 
@@ -230,16 +231,11 @@ items rowid.
 
 ## TODO
 
-- **MCP surface** (`tools/library.py`: `library_scan` / `library_search` /
-  `library_insert`), registered by appending `library` to `server.py`'s
-  `from tools import ...` line. `library_search` would work on the free edition
-  since it never touches Resolve, and would give the `video-edit` skill a way to
-  actually find "the airhorn". Deferred by choice, ~90 min.
-- **Studio-only actions** — insert at playhead, import to bin. Note that
-  `Project.InsertAudioToCurrentTrackAtPlayhead(path, 0, 0)` takes a **file path
-  directly** with no media-pool import, which is strictly better than dragging
-  for SFX. Untestable until Studio is installed.
-- **`resolve/connection.py` helpers** — `ensure_bin(path)` and a
-  `current_folder(folder)` contextmanager modelled on `comp_lock`. `ImportMedia()`
-  targets whatever bin happens to be selected with no way to specify one, which
-  makes `tools/edit.py:import_media` a latent bug today.
+Nothing outstanding in this repo.
+
+The three Resolve-integration items that used to sit here — the MCP library
+surface, the Studio-only playhead insert, and the `ensure_bin` /
+`current_folder` helpers — describe `tools/`, `server.py` and
+`resolve/connection.py`, none of which live in Stash. They moved to
+`docs/media-pool-todos.md` in the **`mcp-da-vinci`** repo, next to the code
+they are about.

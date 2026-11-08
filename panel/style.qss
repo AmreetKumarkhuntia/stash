@@ -31,6 +31,22 @@ QToolButton:checked {
     color: #ffffff;
 }
 
+/* Tag chips: pills, and quieter than the kind filter so the row above still
+   reads as the primary control. */
+QToolButton[chip="true"] {
+    background: #232323;
+    border: 1px solid #343434;
+    border-radius: 9px;
+    padding: 2px 9px;
+    color: #a8a8a8;
+}
+QToolButton[chip="true"]:hover { background: #2d2d2d; color: #dcdcdc; }
+QToolButton[chip="true"]:checked {
+    background: #2f4f61;
+    border: 1px solid #3fa7d6;
+    color: #ffffff;
+}
+
 QListView {
     background: #202020;
     border: 1px solid #333333;

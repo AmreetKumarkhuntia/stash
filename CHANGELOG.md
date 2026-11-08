@@ -7,6 +7,27 @@ carries the section below its version.
 
 ## Unreleased
 
+- **Per-file tags can now be set.** Press **T** on a tile, or
+  `npm run tag -- "<name>" word word`. The storage, the merge into the search
+  index and the survives-a-rescan guarantee were all already built and
+  reachable by nothing — this connects the write half. Tags are keyed by path,
+  so they outlive a rescan and a remove/re-add of the folder.
+- **Tag chips** under the search box: the most common tags in the current
+  results, click to narrow, several at once to require all of them. The chip
+  row is computed from the results *before* the chip filter, so it does not
+  collapse to the single tag you just clicked.
+- `stashlib.cli search` gained `--tag` and `--root`, both repeatable. The
+  filters existed in the ranker and no caller ever passed them; `--root`
+  accepts a folder path or the label from `roots`.
+- Fixed: `scripts/ci/release_notes.py` required a `--version` it never read,
+  and the release workflow dutifully passed it.
+- Docs: `panel/results_view.py` pointed at a `docs/library-panel-notes.md` that
+  has never existed; `NOTES.md` now says which of its cross-references live in
+  the sibling `mcp-da-vinci` repo, and its TODO list — three Resolve-scripting
+  items about files not in this repo — moved there. The README command table
+  was missing `icon` and `shortcut`, and claimed `npm run check` runs what CI
+  runs, which it does not.
+
 ## 1.3.0 — 2026-08-09
 
 - The Windows "Installed apps" entry now carries a description and links:

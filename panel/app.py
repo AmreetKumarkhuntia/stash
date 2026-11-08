@@ -6,6 +6,7 @@ from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QProgressBar,
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from stashlib.library import Library
 
-from .filters import KindFilter, SearchBar
+from .filters import KindFilter, SearchBar, TagChips
 from .hotkey import DEFAULT_LABEL as hotkey_label
 from .hotkey import GlobalHotkey, bring_to_front
 from .model import LibraryModel
@@ -39,6 +40,7 @@ class MainWindow(QMainWindow):
         self.library = Library()
         self.worker: RefreshWorker | None = None
         self.kind: str | None = None
+        self.tags: frozenset[str] = frozenset()
         self.favorites_only = False
         self.compact = False
         self._suppress_autoplay = False
@@ -113,12 +115,17 @@ class MainWindow(QMainWindow):
 
         outer.addLayout(top)
 
+        self.chips = TagChips(self)
+        self.chips.tagsChanged.connect(self.on_tags_changed)
+        outer.addWidget(self.chips)
+
         self.model = LibraryModel(self)
         self.thumbs = ThumbLoader(self)
         self.thumbs.ready.connect(self.on_thumb_ready)
         self.view = ResultsView(self)
         self.view.setModel(self.model)
         self.view.favoriteToggled.connect(self.on_favorite_toggled)
+        self.view.tagsRequested.connect(self.on_edit_tags)
         self.view.auditionRequested.connect(self.on_audition)
         self.view.dragStarted.connect(
             lambda n: self.status.setText(f"dragged {n} file(s)")
@@ -172,12 +179,31 @@ class MainWindow(QMainWindow):
 
     # -------------------------------------------------------------- query ---
     def rerun_query(self) -> None:
-        hits = self.library.search(
+        # Two passes. The chips are derived from the result *before* the tag
+        # filter, so ticking one narrows the grid without collapsing the chip
+        # row to the single tag you just picked. A ranked pass is 0.1-10 ms
+        # over 5,000 items (NOTES.md), so paying for it twice per keystroke is
+        # still far inside budget -- the same measurement that kept sqlite off
+        # the query path in the first place.
+        base = self.library.search(
             text=self.search.text(),
             kind=self.kind,
             favorites_only=self.favorites_only,
             limit=RESULT_LIMIT,
         )
+        self.chips.set_tags(self.library.top_tags(base))
+
+        if self.tags:
+            hits = self.library.search(
+                text=self.search.text(),
+                kind=self.kind,
+                tags=self.tags,
+                favorites_only=self.favorites_only,
+                limit=RESULT_LIMIT,
+            )
+        else:
+            hits = base
+
         self.model.set_items(hits)
         if hits:
             # Selecting row 0 is bookkeeping, not the user arrowing through
@@ -225,6 +251,10 @@ class MainWindow(QMainWindow):
         self.kind = kind
         self.rerun_query()
 
+    def on_tags_changed(self, tags: frozenset[str]) -> None:
+        self.tags = tags
+        self.rerun_query()
+
     def toggle_favorites(self) -> None:
         self.favorites_only = self.favorite_button.isChecked()
         self.rerun_query()
@@ -236,6 +266,29 @@ class MainWindow(QMainWindow):
             self.model.refresh_row(row)
         self.status.setText(
             f"{'★ favourited' if item.favorite else 'unfavourited'}  {item.stem}"
+        )
+
+    def on_edit_tags(self, item) -> None:
+        """Edit the per-file tags. Press T on a tile.
+
+        `set_user_tags` persists and re-derives item.tags in one call, so the
+        new words are searchable immediately -- no rescan, and they survive one
+        because user_meta is keyed by path rather than by an items rowid.
+        """
+        text, ok = QInputDialog.getText(
+            self,
+            "Tags",
+            f"Space-separated tags for  {item.stem}",
+            text=item.user_tags,
+        )
+        if not ok:
+            return
+        self.library.set_user_tags(item, " ".join(text.split()))
+        row = self.model.row_for_path(item.path)
+        if row >= 0:
+            self.model.refresh_row(row)
+        self.status.setText(
+            f"tagged  {item.stem}  →  {item.user_tags or '(none)'}"
         )
 
     def on_current_changed(self, current, _previous) -> None:

@@ -243,10 +243,9 @@ jobs:
         env:
           INSTALLER: ${{ steps.build.outputs.installer }}
           SHA256: ${{ steps.sums.outputs.sha256 }}
-          VERSION: ${{ steps.version.outputs.version }}
         run: |
           python scripts/ci/release_notes.py `
-            --installer $env:INSTALLER --sha256 $env:SHA256 --version $env:VERSION `
+            --installer $env:INSTALLER --sha256 $env:SHA256 `
             --out $env:RUNNER_TEMP\notes.md
           Get-Content -LiteralPath $env:RUNNER_TEMP\notes.md
 

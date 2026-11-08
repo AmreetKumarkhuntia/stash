@@ -3,7 +3,8 @@
 `startDrag` builds a QMimeData carrying file URLs, which Qt converts to a
 Windows CF_HDROP: byte-for-byte what Explorer puts on the clipboard, and what
 Resolve's Media Pool and timeline already know how to accept. Verified in
-scripts/spike_drag.py; see docs/library-panel-notes.md.
+scripts/spike_drag.py; see NOTES.md, "The drag bug that cost a day" and
+"Diagnosing drag problems".
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from .model import LibraryModel
 class ResultsView(QListView):
     auditionRequested = Signal(object)
     favoriteToggled = Signal(object)
+    tagsRequested = Signal(object)
     dragStarted = Signal(int)
 
     def __init__(self, parent=None) -> None:
@@ -157,6 +159,10 @@ class ResultsView(QListView):
             return
         if key in (Qt.Key_F,) and item is not None and not event.modifiers():
             self.favoriteToggled.emit(item)
+            event.accept()
+            return
+        if key in (Qt.Key_T,) and item is not None and not event.modifiers():
+            self.tagsRequested.emit(item)
             event.accept()
             return
         super().keyPressEvent(event)
